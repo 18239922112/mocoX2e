@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>xmind2excel</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='image/X2E.png') }}">
+</head>
+<body>
+    <h2>上传文件</h2>
+    <form id="uploadForm" enctype="multipart/form-data">
+        <input type="file" name="file" id="fileInput">
+        <input type="button" id="upload" value="上传">
+        <input type="button" id="download" value="获取excel文件:">
+    </form>
+
+    <script src="http://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            $("#upload").click(function() {
+
+                if ($("#fileInput").val() === ""){
+                    alert('文件不可为空,请先选择要上传的文件');
+                } else {
+                    var formData = new FormData();
+                    var fileInput = $('input[type="file"]')[0].files[0];
+                    formData.append('file', fileInput);
+
+                    $.ajax({
+                        url: '/x2e/upload',
+                        type: 'POST',
+                        data: formData,
+                        processData: false,
+                        contentType: false,
+                        success: function(response) {
+
+                            alert("上传文件成功");
+                            $("#download").val("获取excel文件:"+response);
+                            $("#fileInput").val("");
+                        },
+                        error: function(error) {
+                            console.log(error);
+                        }
+                    });
+                }
+
+            });
+
+            $("#download").click(function() {
+                var buttonValue = $(this).val();
+
+                var startIndex = buttonValue.indexOf("获取excel文件:");
+                console.log(buttonValue.length);
+                if (buttonValue.length > 10){
+                    // 截取后面的部分
+                    if (startIndex !== -1) {
+                        var extractedText = buttonValue.substring(startIndex + "获取execl文件:".length);
+
+                    } else {
+                        alert("未找到该文件");
+                    }
+                    var a = document.createElement('a');
+                    a.href = "/x2e/download";
+                    a.download = 'extractedText';
+                    a.click();
+                    //清空文件防止重复下载
+                    alert("下载文件成功");
+                    $("#download").val("获取excel文件:");
+                } else {
+                        alert("请先上传文件再下载");
+                    }
+
+
+            });
+
+
+
+
+        });
+    </script>
+</body>
+</html>

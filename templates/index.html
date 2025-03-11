@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MOCO接口</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='image/moco.png') }}">
+    <style>
+        /* 弹窗样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #f9f9f9;
+            padding: 20px;
+            border: 1px solid #ccc;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        #list {
+            width: 200px;
+            height: 50px;
+        }
+        #add {
+            width: 200px;
+            height: 50px;
+        }
+        #queryLike{
+            width: 180px;
+            height: 45px;
+        }
+        #tj {
+            display: flex;
+            justify-content: space-between;
+            margin: 0 auto;
+            width: 200px; /* 设置按钮容器的宽度 */
+        }
+        #istrue {
+            display: flex;
+            justify-content: space-between;
+            margin: 10 auto;
+            width: 500px; /* 设置按钮容器的宽度 */
+        }
+        #istrue {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #f9f9f9;
+            padding: 20px;
+            border: 1px solid #ccc;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        #data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        /* 分页按钮样式 */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .pagination button {
+            margin: 0 5px;
+            cursor: pointer;
+        }
+        /* 禁用状态下的按钮样式 */
+        .disabled-button {
+            background-color: lightgray;
+            color: gray;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="">
+        <button type="button" id="list">列表</button>
+        <button type="button" id="add">新增</button>
+        <label for="name">搜索API路径:</label>
+        <input id="queryLike">
+        <button onclick="window.location.href = '/x2e'">X2E转换</button>
+        <marquee behavior="scroll" direction="left" scrollamount="5">
+            请注意:自定义的接口需要使用9090端口来访问,例如在页面新增了/api/test接口,那么访问地址为http://localhost:9090/api/test即可访问到该接口
+        </marquee>
+    </div>
+    <div id="istrue">
+        <h2 id="delneirong">确定删除</h2>
+        <label for="name">确定删除该条moco数据吗?</label>
+        <button id="del-true" type="submit">确定</button>
+        <button id="del-false" type="submit">取消</button>
+    </div>
+    <table id="data-table">
+        <thead>
+            <tr>
+                <th>接口名称</th>
+                <th>接口地址</th>
+                <th>是否启用</th>
+                <th>操作栏</th>
+            </tr>
+        </thead>
+        <tbody id="data-table-body">
+            <!-- 这里将填充后台数据 -->
+        </tbody>
+    </table>
+
+    <div id="myModal" class="modal">
+        <h2 id="dynamicHeading">新增moco接口</h2>
+        <label for="name">接口名称:</label>
+        <input id="apiname" type="text"><br><br>
+        <label for="name">api路径:</label>
+        <input id="apipath" type="text"><br><br>
+        <label for="name">是否启用:</label>
+        <input type="checkbox" id="check"><br><br>
+        <label for="name">模拟返回报文:</label>
+        <textarea id="apitext" rows="4" cols="50"></textarea><br><br>
+        <dev id="tj"> <!-- 按钮容器 -->
+            <input id="tj-submit" type="submit" value="提交">
+            <input id="tj-cancel" type="submit" value="取消">
+        </dev>
+        <input type="hidden" id="operation-type" value="">
+    </div>
+    <!--分页按钮-->
+    <div class="pagination">
+        <div id="dynamic-text"></div>
+        <button id="prev-btn">上一页</button>
+        <input type="text" id="page" value="">
+        <button id="next-btn">下一页</button>
+    </div>
+
+
+
+    <script src="http://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            //跳转至x2e页面
+            $("#x2e").click(function() {
+                $.ajax({
+                        url: '/moco/x2e',
+                        type: 'GET',
+                        success: function(response) {
+                        },
+                        error: function(error) {
+                        }
+                    });
+            });
+            //新增打开表单
+            $("#add").click(function() {
+                $("#myModal").show();
+                // 设置操作类型为“新增”
+                $("#operation-type").val("add");
+                // 获取要修改的<h2>标签元素
+                var heading = document.getElementById("dynamicHeading");
+                heading.innerHTML = "新增moco接口";
+                // 解除禁用API路径输入框
+                $("#apipath").prop("disabled", false);
+            });
+            //默认勾选启用
+            $("#check").prop("checked", true);
+
+            //取消
+            $("#tj-cancel").click(function() {
+                $("#myModal").hide();
+                $.ajax({
+                    url: "/moco/queryAll",
+                    type: "GET",
+                    success: function(data) {
+                        // 清空表格内容
+                        $("#data-table-body").empty();
+                        // 填充数据到表格
+                        //注意这里返回的数据是json格式在foreach时必须加data.success.foreach，不然会报错
+                        data.success.forEach(function(item) {
+
+                            var row = "<tr>";
+                            row += "<td>" + item.apimame + "</td>";
+                            row += "<td>" + item.apipath + "</td>";
+                            row += "<td>" + (item.isenable === 0 ? "是" : "否") + "</td>";
+                            row += "<td class='action-bar'>"; // 开始操作栏单元格
+                            // 添加编辑和删除按钮
+                            row += "<button class='edit-btn'>编辑</button>";
+                            row += "<button class='delete-btn'>删除</button>";
+
+                            row += "</td>"; // 结束操作栏单元格
+                            row += "</tr>";
+
+                            $('#data-table tbody').append(row);
+                        });
+                    },
+                    error: function() {
+                        alert("查询失败，请重试");
+                    }
+                });
+            });
+            //列表展示数据
+            $("#list").click(function() {
+                // 发送查询请求至后端
+                $.ajax({
+                    url: "/moco/queryAll",
+                    type: "GET",
+                    success: function(data) {
+                        // 清空表格内容
+                        $("#data-table-body").empty();
+                        // 填充数据到表格
+                        //注意这里返回的数据是json格式在foreach时必须加data.success.foreach，不然会报错
+                        data.success.forEach(function(item) {
+
+                            var row = "<tr>";
+                            row += "<td>" + item.apimame + "</td>";
+                            row += "<td>" + item.apipath + "</td>";
+                            row += "<td>" + (item.isenable === 0 ? "是" : "否") + "</td>";
+                            row += "<td class='action-bar'>"; // 开始操作栏单元格
+                            // 添加编辑和删除按钮
+                            row += "<button class='edit-btn'>编辑</button>";
+                            row += "<button class='delete-btn'>删除</button>";
+
+                            row += "</td>"; // 结束操作栏单元格
+                            row += "</tr>";
+                            $('#data-table tbody').append(row);
+                        });
+                    },
+                    error: function() {
+                        alert("查询失败，请重试");
+                    }
+                });
+            });
+
+
+            //提交
+            $("#tj-submit").click(function() {
+                var apiname = $("#apiname").val();
+                var apipath = $("#apipath").val();
+                var apitext = $("#apitext").val();
+                var isChecked = $("#check").is(":checked");
+                if (isChecked === true){
+                    isChecked = 0
+                }else {
+                    isChecked = 1
+                }
+                //console.log(isChecked)
+                if (apiname === '' || apipath === '' || apitext === ''){
+                    alert("接口名称、api路径、模拟返回报文为空，请检查")
+                    return
+                }
+                var dataToSend = {
+                        "apiname": apiname,
+                        "apipath": apipath,
+                        "apitext": apitext,
+                        "isChecked":isChecked
+                    };
+                //获取隐藏弹窗的属性是打开了新增页面还是编辑页面
+                var operationType = $("#operation-type").val();
+
+                if (operationType === "add") {
+                    // 执行新增操作
+                    $.ajax({
+                    url: "/moco/addMoco",
+                    type: "POST",
+                    data: JSON.stringify(dataToSend),
+                    contentType: "application/json",
+                    success: function(data) {
+                        var msg = data['msg'];
+                        var code = data['code'];
+                        if (code === 200){
+                            alert(msg);
+                            //关闭弹窗
+                            $("#myModal").hide();
+                            $.ajax({
+                                url: "/moco/queryAll",
+                                type: "GET",
+                                success: function(data) {
+                                    // 清空表格内容
+                                    $("#data-table-body").empty();
+                                    // 填充数据到表格
+                                    //注意这里返回的数据是json格式在foreach时必须加data.success.foreach，不然会报错
+                                    data.success.forEach(function(item) {
+
+                                        var row = "<tr>";
+                                        row += "<td>" + item.apimame + "</td>";
+                                        row += "<td>" + item.apipath + "</td>";
+                                        row += "<td>" + (item.isenable === 0 ? "是" : "否") + "</td>";
+                                        row += "<td class='action-bar'>"; // 开始操作栏单元格
+                                        // 添加编辑和删除按钮
+                                        row += "<button class='edit-btn'>编辑</button>";
+                                        row += "<button class='delete-btn'>删除</button>";
+
+                                        row += "</td>"; // 结束操作栏单元格
+                                        row += "</tr>";
+                                        $('#data-table tbody').append(row);
+                                        // 刷新页面
+                                        location.reload();
+                                    });
+                                },
+                                error: function() {
+                                    alert("查询失败，请重试");
+                                }
+                            });
+                        } else{
+                            alert(msg);
+                        }
+                        //console.log(data)
+
+                    },
+                    error: function() {
+                        alert("服务端错误");
+                        //关闭弹窗
+                        $("#myModal").hide();
+                    }
+                    });
+                } else if (operationType === "edit") {
+                    // 执行编辑操作
+                    $.ajax({
+                    url: "/moco/editMoco",
+                    type: "POST",
+                    data: JSON.stringify(dataToSend),
+                    contentType: "application/json",
+                    success: function(data) {
+                        var msg = data['msg'];
+                        var code = data['code'];
+                        if (code === 200){
+                            alert(msg);
+                            //关闭弹窗
+                            $("#myModal").hide();
+                            $.ajax({
+                                url: "/moco/queryAll",
+                                type: "GET",
+                                success: function(data) {
+                                    // 清空表格内容
+                                    $("#data-table-body").empty();
+                                    // 填充数据到表格
+                                    //注意这里返回的数据是json格式在foreach时必须加data.success.foreach，不然会报错
+                                    data.success.forEach(function(item) {
+
+                                        var row = "<tr>";
+                                        row += "<td>" + item.apimame + "</td>";
+                                        row += "<td>" + item.apipath + "</td>";
+                                        row += "<td>" + (item.isenable === 0 ? "是" : "否") + "</td>";
+                                        row += "<td class='action-bar'>"; // 开始操作栏单元格
+                                        // 添加编辑和删除按钮
+                                        row += "<button class='edit-btn'>编辑</button>";
+                                        row += "<button class='delete-btn'>删除</button>";
+
+                                        row += "</td>"; // 结束操作栏单元格
+                                        row += "</tr>";
+                                        $('#data-table tbody').append(row);
+                                        // 刷新页面
+                                        location.reload();
+                                    });
+                                },
+                                error: function() {
+                                    alert("查询失败，请重试");
+                                }
+                            });
+                        } else{
+                            alert(msg);
+                        }
+                        //console.log(data)
+
+                    },
+                    error: function() {
+                        alert("服务端错误");
+                        //关闭弹窗
+                        $("#myModal").hide();
+                    }
+                });
+                }
+
+            });
+            //编辑
+            $(document).on('click', '.edit-btn', function() {
+                // 设置操作类型为“编辑”
+                $("#operation-type").val("edit");
+                // 获取要修改的<h2>标签元素
+                var heading = document.getElementById("dynamicHeading");
+                heading.innerHTML = "编辑moco接口";
+
+                // 获取所点击编辑按钮所在行的数据
+                var rowData = $(this).closest('tr').find('td').map(function() {
+                    return $(this).text();
+                }).get();
+                // 禁用API路径输入框
+                $("#apipath").prop("disabled", true);
+                // 将数据填充到编辑弹窗中
+                $("#apiname").val(rowData[0]); // 接口名称
+                $("#apipath").val(rowData[1]); // 接口地址
+                $("#check").prop("checked", rowData[2] === '是'); // 是否启用
+
+                // 显示编辑弹窗
+                $("#myModal").show();
+                var dataToSend = {
+                        "apipath": rowData[1]
+                    };
+                $.ajax({
+                    url: "/moco/queryApi",
+                    type: "POST",
+                    data: JSON.stringify(dataToSend),
+                    contentType: "application/json",
+                    success: function(data) {
+
+                        $("#apitext").val(data.apitext)
+                    },
+                    error: function() {
+                        alert("查询失败，请重试");
+                    }
+                });
+
+            });
+            //删除
+            $(document).on('click', '.delete-btn', function() {
+                //展示删除确认弹窗
+                $("#istrue").show();
+                // 获取所点击编辑按钮所在行的数据
+                var rowData = $(this).closest('tr').find('td').map(function() {
+                    return $(this).text();
+                }).get();
+                var dataToSend = {
+                        "apipath": rowData[1]
+                    };
+                //点击删除确认框中的确认按钮
+                $(document).on('click', '#del-true', function() {
+                        $.ajax({
+                        url: "/moco/delMoco",
+                        type: "POST",
+                        data: JSON.stringify(dataToSend),
+                        contentType: "application/json",
+                        success: function(data) {
+                            if (data.code === 200){
+                                alert(data.msg);
+                                //关闭弹窗
+                                $("#istrue").hide();
+                                $.ajax({
+                                    url: "/moco/queryAll",
+                                    type: "GET",
+                                    success: function(data) {
+                                        // 清空表格内容
+                                        $("#data-table-body").empty();
+                                        // 填充数据到表格
+                                        //注意这里返回的数据是json格式在foreach时必须加data.success.foreach，不然会报错
+                                        data.success.forEach(function(item) {
+
+                                            var row = "<tr>";
+                                            row += "<td>" + item.apimame + "</td>";
+                                            row += "<td>" + item.apipath + "</td>";
+                                            row += "<td>" + (item.isenable === 0 ? "是" : "否") + "</td>";
+                                            row += "<td class='action-bar'>"; // 开始操作栏单元格
+                                            // 添加编辑和删除按钮
+                                            row += "<button class='edit-btn'>编辑</button>";
+                                            row += "<button class='delete-btn'>删除</button>";
+
+                                            row += "</td>"; // 结束操作栏单元格
+                                            row += "</tr>";
+                                            $('#data-table tbody').append(row);
+                                            // 刷新页面
+                                            location.reload();
+                                        });
+                                    },
+                                    error: function() {
+                                        alert("查询失败，请重试");
+                                    }
+                                });
+                            }
+
+
+
+                        },
+                        error: function() {
+                            alert("查询失败，请重试");
+                        }
+                    });
+                });
+                //点击删除确认框中的取消按钮
+                $(document).on('click', '#del-false', function() {
+                        //展示删除确认弹窗
+                        $("#istrue").hide();
+                });
+
+
+            });
+
+
+
+
+
+
+			// 访问页面就发送查询请求至后端
+			$.ajax({
+				url: "/moco/queryAll",
+				type: "GET",
+				success: function(data) {
+					// 清空表格内容
+					$("#data-table-body").empty();
+					// 填充数据到表格
+					//注意这里返回的数据是json格式在foreach时必须加data.success.foreach，不然会报错
+					data.success.forEach(function(item) {
+
+						var row = "<tr>";
+						row += "<td>" + item.apimame + "</td>";
+						row += "<td>" + item.apipath + "</td>";
+						row += "<td>" + (item.isenable === 0 ? "是" : "否") + "</td>";
+						row += "<td class='action-bar'>"; // 开始操作栏单元格
+                        // 添加编辑和删除按钮
+                        row += "<button class='edit-btn'>编辑</button>";
+                        row += "<button class='delete-btn'>删除</button>";
+
+                        row += "</td>"; // 结束操作栏单元格
+                        row += "</tr>";
+
+						$('#data-table tbody').append(row);
+					});
+				},
+				error: function() {
+					alert("查询失败，请重试");
+				}
+			});
+
+            //分页
+            var currentPage = 1; // 当前页数
+            $("#page").val(currentPage);
+
+
+
+            // 获取上一页按钮元素
+            var prevButton = document.getElementById('prev-btn');
+            // 获取下一页按钮元素
+            var nextButton = document.getElementById('next-btn');
+
+            //判断是否是第一页，如果是第一页的时候第一页按钮不可点击
+            if (Number($("#page").val()) === 1){
+
+                    prevButton.classList.add('disabled-button');
+                    prevButton.disabled = true;
+
+            }else {
+                        prevButton.classList.remove('disabled-button');
+                        prevButton.disabled = false;
+            }
+
+
+            //点击上一页
+            $("#prev-btn").click(function() {
+                var page = (Number($("#page").val()) - 2) * 10;
+                $("#page").val(Number($("#page").val()) - 1)
+                //判断是否是第一页，如果是第一页的时候第一页按钮不可点击
+                if (Number($("#page").val()) === 1){
+                    prevButton.classList.add('disabled-button');
+                    prevButton.disabled = true;
+
+                }else {
+                        prevButton.classList.remove('disabled-button');
+                        prevButton.disabled = false;
+                }
+                if (Number($("#page").val()) > Number(globalValue / 10)){
+
+                        nextButton.classList.add('disabled-button');
+                        nextButton.disabled = true;
+
+                }else {
+
+                        nextButton.classList.remove('disabled-button');
+                        nextButton.disabled = false;
+                }
+                var dataToSend = {
+                        "page": page
+                    };
+                console.log(dataToSend)
+                $.ajax({
+                    url: "/moco/queryLimit",
+                    type: "POST",
+                    data: JSON.stringify(dataToSend),
+                    contentType: "application/json",
+                    success: function(data) {
+                        // 清空表格内容
+                        $("#data-table-body").empty();
+                        // 填充数据到表格
+                        //注意这里返回的数据是json格式在foreach时必须加data.success.foreach，不然会报错
+                        data.success.forEach(function(item) {
+
+                            var row = "<tr>";
+                            row += "<td>" + item.apimame + "</td>";
+                            row += "<td>" + item.apipath + "</td>";
+                            row += "<td>" + (item.isenable === 0 ? "是" : "否") + "</td>";
+                            row += "<td class='action-bar'>"; // 开始操作栏单元格
+                            // 添加编辑和删除按钮
+                            row += "<button class='edit-btn'>编辑</button>";
+                            row += "<button class='delete-btn'>删除</button>";
+
+                            row += "</td>"; // 结束操作栏单元格
+                            row += "</tr>";
+
+                            $('#data-table tbody').append(row);
+                        });
+                        },
+                        error: function() {
+                            alert("查询失败，请重试");
+                        }
+                });
+            });
+
+
+
+
+
+
+            //点击下一页
+            $("#next-btn").click(function() {
+                var page = (Number($("#page").val())) * 10;
+                $("#page").val(Number($("#page").val()) + 1)
+                //判断是否是第一页，如果是第一页的时候第一页按钮不可点击
+                if (Number($("#page").val()) > Number(globalValue / 10)){
+
+                        nextButton.classList.add('disabled-button');
+                        nextButton.disabled = true;
+
+                }else {
+
+                        nextButton.classList.remove('disabled-button');
+                        nextButton.disabled = false;
+                }
+                if (Number($("#page").val()) === 1){
+                    prevButton.classList.add('disabled-button');
+                    prevButton.disabled = true;
+
+                }else {
+                        prevButton.classList.remove('disabled-button');
+                        prevButton.disabled = false;
+                }
+
+                var dataToSend = {
+                        "page": page
+                    };
+                console.log(dataToSend)
+                $.ajax({
+                    url: "/moco/queryLimit",
+                    type: "POST",
+                    data: JSON.stringify(dataToSend),
+                    contentType: "application/json",
+                    success: function(data) {
+                        // 清空表格内容
+                        $("#data-table-body").empty();
+                        // 填充数据到表格
+                        //注意这里返回的数据是json格式在foreach时必须加data.success.foreach，不然会报错
+                        data.success.forEach(function(item) {
+
+                            var row = "<tr>";
+                            row += "<td>" + item.apimame + "</td>";
+                            row += "<td>" + item.apipath + "</td>";
+                            row += "<td>" + (item.isenable === 0 ? "是" : "否") + "</td>";
+                            row += "<td class='action-bar'>"; // 开始操作栏单元格
+                            // 添加编辑和删除按钮
+                            row += "<button class='edit-btn'>编辑</button>";
+                            row += "<button class='delete-btn'>删除</button>";
+
+                            row += "</td>"; // 结束操作栏单元格
+                            row += "</tr>";
+
+                            $('#data-table tbody').append(row);
+                        });
+                        },
+                        error: function() {
+                            alert("查询失败，请重试");
+                        }
+                });
+            });
+            // 访问页面就发送查询请求至后端查询conut总数
+            var globalValue;
+			$.ajax({
+				url: "/moco/queryCount",
+				type: "GET",
+				success: function(data) {
+				    globalValue = data.count;
+					// 拼接动态字符
+                    var dynamicText = "共" + data.count + "条";
+                    // 获取要展示动态文字的元素
+                    var dynamicTextElement = document.getElementById('dynamic-text');
+                    // 将拼接后的动态字符展示在页面上
+                    dynamicTextElement.textContent = dynamicText;
+				},
+				error: function() {
+					alert("查询失败，请重试");
+				}
+			});
+            //实时搜索
+            $('#queryLike').on('input', function() {
+                var apipath = $(this).val().trim();
+                var dataToSend = {
+                        "apipath": apipath
+                    };
+                $.ajax({
+                    url: "/moco/queryLike",
+                    type: "POST",
+                    data: JSON.stringify(dataToSend),
+                    contentType: "application/json",
+                    success: function(data) {
+						// 清空表格内容
+						$("#data-table-body").empty();
+						// 填充数据到表格
+						//注意这里返回的数据是json格式在foreach时必须加data.success.foreach，不然会报错
+						data.success.forEach(function(item) {
+							var row = "<tr>";
+							row += "<td>" + item.apimame + "</td>";
+							row += "<td>" + item.apipath + "</td>";
+							row += "<td>" + (item.isenable === 0 ? "是" : "否") + "</td>";
+							row += "<td class='action-bar'>"; // 开始操作栏单元格
+							// 添加编辑和删除按钮
+							row += "<button class='edit-btn'>编辑</button>";
+							row += "<button class='delete-btn'>删除</button>";
+
+							row += "</td>"; // 结束操作栏单元格
+							row += "</tr>";
+							$('#data-table tbody').append(row);
+
+						});
+                    },
+                    error: function() {
+                        alert("服务端错误");
+                    }
+                });
+            });
+
+
+
+
+
+
+
+        });
+    </script>
+</body>
+</html>
